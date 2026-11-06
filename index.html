@@ -4,12 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>پلنر مطالعه — Time Planner</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#667eea" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="پلنر مطالعه" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./assets/app.css" />
+  <script src="./assets/vendor/jspdf.umd.min.js"></script>
+  <script src="./pwa.js" defer></script>
   <style>
+    @font-face { font-family: 'Vazirmatn'; src: url('./assets/fonts/Vazirmatn-variable.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
     * { font-family: 'Vazirmatn', sans-serif; }
     body {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -83,6 +89,8 @@
     <div class="text-center mb-8 slide-in">
       <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-2 drop-shadow-lg">📚 پلنر مطالعه</h1>
       <p class="text-white/90 text-lg">ساعات مطالعه‌ات رو مدیریت کن، در پایان هفته گزارش بگیر</p>
+      <button id="installApp" type="button" class="hidden mt-4 px-5 py-2 rounded-xl bg-white text-indigo-700 font-semibold shadow-md hover:bg-indigo-50 transition">📲 نصب برنامه</button>
+      <p id="installHelp" class="hidden mt-3 text-white text-sm">برای نصب در آیفون یا آیپد، از منوی اشتراک‌گذاری Safari گزینهٔ «Add to Home Screen» را انتخاب کن.</p>
     </div>
 
     <!-- Stats Cards -->
@@ -432,7 +440,8 @@
     function ensureHtml2Canvas(cb) {
       if (window.html2canvas) { cb(); return; }
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.src = './assets/vendor/html2canvas.min.js';
+      s.onerror = () => showToast('بارگذاری ابزار PDF ناموفق بود', 'error');
       s.onload = cb;
       document.head.appendChild(s);
     }
