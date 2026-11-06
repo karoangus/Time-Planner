@@ -4,12 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>پلنر مطالعه — Time Planner</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#667eea" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="پلنر مطالعه" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./assets/app.css" />
+  <script src="./assets/vendor/jspdf.umd.min.js"></script>
+  <script src="./pwa.js" defer></script>
   <style>
+    @font-face { font-family: 'Vazirmatn'; src: url('./assets/fonts/Vazirmatn-variable.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
     * { font-family: 'Vazirmatn', sans-serif; }
     body {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -83,6 +89,8 @@
     <div class="text-center mb-8 slide-in">
       <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-2 drop-shadow-lg">📚 پلنر مطالعه</h1>
       <p class="text-white/90 text-lg">ساعات مطالعه‌ات رو مدیریت کن، در پایان هفته گزارش بگیر</p>
+      <button id="installApp" type="button" class="hidden mt-4 px-5 py-2 rounded-xl bg-white text-indigo-700 font-semibold shadow-md hover:bg-indigo-50 transition">📲 نصب برنامه</button>
+      <p id="installHelp" class="hidden mt-3 text-white text-sm">برای نصب در آیفون یا آیپد، از منوی اشتراک‌گذاری Safari گزینهٔ «Add to Home Screen» را انتخاب کن.</p>
     </div>
 
     <!-- Stats Cards -->
@@ -93,11 +101,11 @@
       </div>
       <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
         <p class="text-gray-500 text-sm mb-1">کل ساعات مطالعه</p>
-        <p id="stat-total-hours" class="text-3xl font-bold text-amber-600">0</p>
+        <p id="stat-total-hours" dir="ltr" class="text-3xl font-bold text-amber-600">0</p>
       </div>
       <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
         <p class="text-gray-500 text-sm mb-1">کل ساعات تست</p>
-        <p id="stat-total-test-hours" class="text-3xl font-bold text-teal-600">0</p>
+        <p id="stat-total-test-hours" dir="ltr" class="text-3xl font-bold text-teal-600">0</p>
       </div>
       <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
         <p class="text-gray-500 text-sm mb-1">تاریخ امروز</p>
@@ -177,6 +185,8 @@
     const STORAGE_KEY = 'time_planner_courses_v1';
     let courses = [];
     let pendingConfirm = null;
+    // Draft selections are independent from the persisted course totals.
+    const selectedMinutes = new Map();
 
     function loadCourses() {
       try {
@@ -198,6 +208,15 @@
     function toPersianNum(n) {
       const map = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
       return String(n).replace(/\d/g, d => map[+d]);
+    }
+
+    function formatMinutes(minutes) {
+      const whole = Math.round(minutes);
+      return toPersianNum(`${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`);
+    }
+
+    function formatHours(hours) {
+      return formatMinutes(hours * 60);
     }
 
     function todayStr() {
@@ -264,30 +283,42 @@
       if (!c) return;
       openModal('حذف درس', `آیا از حذف درس «${c.name}» مطمئنی؟ تمام ساعات ثبت شده آن هم پاک می‌شود.`, () => {
         courses = courses.filter(x => x.id !== id);
+        selectedMinutes.delete(`study-${id}`);
+        selectedMinutes.delete(`test-${id}`);
         saveCourses();
         render();
         showToast('درس حذف شد', 'info');
       });
     }
 
+    function adjustMinutes(id, type, delta) {
+      if ((type !== 'study' && type !== 'test') || (delta !== 15 && delta !== -15)) return;
+      const key = `${type}-${id}`;
+      const minutes = Math.max(0, (selectedMinutes.get(key) || 0) + delta);
+      selectedMinutes.set(key, minutes);
+      document.getElementById(`duration-${key}`).textContent = formatMinutes(minutes);
+      document.getElementById(`minus-${key}`).disabled = minutes === 0;
+    }
+
     function addHours(id, type = 'study') {
       const isTest = type === 'test';
-      const input = document.getElementById(`${isTest ? 'test-hrs' : 'hrs'}-${id}`);
-      const val = Number(input.value);
-      if (!Number.isFinite(val) || val < 0.01 || Math.abs(Math.round(val * 100) - val * 100) > 1e-8) {
-        showToast('لطفاً عددی حداقل ۰.۰۱ با حداکثر دو رقم اعشار وارد کن', 'error');
+      const key = `${type}-${id}`;
+      const minutes = selectedMinutes.get(key) || 0;
+      if (minutes <= 0) {
+        showToast('ابتدا با دکمهٔ + زمان را انتخاب کن', 'error');
         return;
       }
       const c = courses.find(x => x.id === id);
       if (!c) return;
       const hoursKey = isTest ? 'testHours' : 'hours';
       const logsKey = isTest ? 'testLogs' : 'logs';
+      const val = minutes / 60;
       c[hoursKey] = Math.round((c[hoursKey] + val) * 100) / 100;
       c[logsKey].push({ date: new Date().toISOString(), amount: val });
       saveCourses();
-      input.value = '';
+      selectedMinutes.delete(key);
       render();
-      showToast(`${toPersianNum(val)} ساعت ${isTest ? 'تست' : 'مطالعه'} به «${c.name}» اضافه شد`, 'success');
+      showToast(`⁦${formatMinutes(minutes)}⁩ ساعت ${isTest ? 'تست' : 'مطالعه'} به «${c.name}» اضافه شد`, 'success');
     }
 
     function endWeek() {
@@ -297,6 +328,7 @@
       }
       openModal('اتمام هفته', 'این کار ساعات مطالعه و تست همهٔ دروس را صفر می‌کند (خود دروس باقی می‌مانند). آیا مطمئنی؟', () => {
         courses.forEach(c => { c.hours = 0; c.logs = []; c.testHours = 0; c.testLogs = []; });
+        selectedMinutes.clear();
         saveCourses();
         render();
         showToast('هفتهٔ جدید مبارک! ساعات صفر شدند 🎉', 'success');
@@ -324,51 +356,22 @@
                 </div>
                 <div>
                   <h3 class="text-lg font-bold text-gray-800">${escapeHtml(c.name)}</h3>
-                  <p class="text-sm text-gray-500">${toPersianNum(c.logs.length)} ثبت مطالعه · ${toPersianNum(c.testLogs.length)} ثبت تست</p>
                 </div>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
                 <div class="hours-badge text-white px-4 py-2 rounded-xl font-bold shadow">
-                  ⏱ ${toPersianNum(c.hours)} ساعت مطالعه
+                  ⏱ <bdi dir="ltr">${formatHours(c.hours)}</bdi> ساعت مطالعه
                 </div>
                 <div class="bg-teal-500 text-white px-4 py-2 rounded-xl font-bold shadow">
-                  📝 ${toPersianNum(c.testHours)} ساعت تست
+                  📝 <bdi dir="ltr">${formatHours(c.testHours)}</bdi> ساعت تست
                 </div>
                 <button onclick="deleteCourse('${c.id}')" class="w-10 h-10 rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition flex items-center justify-center font-bold" title="حذف درس">
                   🗑
                 </button>
               </div>
             </div>
-            <div class="flex flex-col sm:flex-row gap-2 mb-2">
-              <input
-                type="number"
-                id="hrs-${c.id}"
-                placeholder="ساعت مطالعه (مثلاً ۱.۵)"
-                aria-label="ساعت مطالعه"
-                step="0.01"
-                min="0.01"
-                class="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors"
-                onkeydown="if(event.key==='Enter') addHours('${c.id}')"
-              />
-              <button onclick="addHours('${c.id}')" class="btn-primary text-white font-semibold px-5 py-2 rounded-xl">
-                ➕ ثبت مطالعه
-              </button>
-            </div>
-            <div class="flex flex-col sm:flex-row gap-2">
-              <input
-                type="number"
-                id="test-hrs-${c.id}"
-                placeholder="ساعت تست (مثلاً ۱.۵)"
-                aria-label="ساعت تست"
-                step="0.01"
-                min="0.01"
-                class="flex-1 min-w-0 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-teal-500 focus:outline-none transition-colors"
-                onkeydown="if(event.key==='Enter') addHours('${c.id}', 'test')"
-              />
-              <button onclick="addHours('${c.id}', 'test')" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-5 py-2 rounded-xl transition">
-                ➕ ثبت تست
-              </button>
-            </div>
+            ${durationControl(c.id, 'study')}
+            ${durationControl(c.id, 'test')}
           `;
           container.appendChild(card);
         });
@@ -377,10 +380,34 @@
       // Stats
       document.getElementById('stat-courses').textContent = toPersianNum(courses.length);
       const total = courses.reduce((s, c) => s + c.hours, 0);
-      document.getElementById('stat-total-hours').textContent = toPersianNum(Math.round(total * 100) / 100);
+      document.getElementById('stat-total-hours').textContent = formatHours(total);
       const totalTest = courses.reduce((s, c) => s + c.testHours, 0);
-      document.getElementById('stat-total-test-hours').textContent = toPersianNum(Math.round(totalTest * 100) / 100);
+      document.getElementById('stat-total-test-hours').textContent = formatHours(totalTest);
       document.getElementById('stat-date').textContent = todayStr();
+    }
+
+    function durationControl(id, type) {
+      const isTest = type === 'test';
+      const key = `${type}-${id}`;
+      const minutes = selectedMinutes.get(key) || 0;
+      const label = isTest ? 'تست' : 'مطالعه';
+      return `
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+          <span class="text-gray-600 text-sm font-semibold sm:w-24">زمان ${label}</span>
+          <div class="flex items-center gap-2 flex-1">
+            <button type="button" onclick="adjustMinutes('${id}', '${type}', -15)" id="minus-${key}"
+              aria-label="کاهش ۱۵ دقیقه از زمان ${label}" ${minutes === 0 ? 'disabled' : ''}
+              class="w-11 h-11 rounded-xl bg-gray-100 text-gray-700 text-xl font-bold hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">−</button>
+            <output id="duration-${key}" dir="ltr" aria-label="زمان انتخاب‌شده ${label}"
+              class="flex-1 text-center font-bold text-gray-700 px-3 py-2 border-2 border-gray-200 rounded-xl">${formatMinutes(minutes)}</output>
+            <button type="button" onclick="adjustMinutes('${id}', '${type}', 15)"
+              aria-label="افزایش ۱۵ دقیقه به زمان ${label}"
+              class="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 text-xl font-bold hover:bg-indigo-200">+</button>
+          </div>
+          <button type="button" onclick="addHours('${id}', '${type}')" class="${isTest ? 'bg-teal-600 hover:bg-teal-700 transition' : 'btn-primary'} text-white font-semibold px-5 py-2 rounded-xl">
+            ➕ ثبت ${label}
+          </button>
+        </div>`;
     }
 
     function escapeHtml(s) {
@@ -413,7 +440,8 @@
     function ensureHtml2Canvas(cb) {
       if (window.html2canvas) { cb(); return; }
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.src = './assets/vendor/html2canvas.min.js';
+      s.onerror = () => showToast('بارگذاری ابزار PDF ناموفق بود', 'error');
       s.onload = cb;
       document.head.appendChild(s);
     }
@@ -437,11 +465,11 @@
           </div>
           <div style="flex:1;background:#fef3c7;border-radius:12px;padding:16px;text-align:center;">
             <div style="color:#92400e;font-size:14px;">کل ساعات مطالعه</div>
-            <div style="font-size:24px;font-weight:bold;color:#92400e;">${Math.round(total*100)/100} ساعت</div>
+            <div style="font-size:24px;font-weight:bold;color:#92400e;"><bdi dir="ltr">${formatHours(total)}</bdi> ساعت</div>
           </div>
           <div style="flex:1;background:#ccfbf1;border-radius:12px;padding:16px;text-align:center;">
             <div style="color:#115e59;font-size:14px;">کل ساعات تست</div>
-            <div style="font-size:24px;font-weight:bold;color:#115e59;">${toPersianNum(Math.round(totalTest*100)/100)} ساعت</div>
+            <div style="font-size:24px;font-weight:bold;color:#115e59;"><bdi dir="ltr">${formatHours(totalTest)}</bdi> ساعت</div>
           </div>
         </div>
         <table style="width:100%;border-collapse:collapse;">
@@ -449,9 +477,7 @@
             <tr style="background:#667eea;color:#fff;">
               <th style="padding:12px;text-align:right;border-radius:0 8px 8px 0;">#</th>
               <th style="padding:12px;text-align:right;">نام درس</th>
-              <th style="padding:12px;text-align:center;">ثبت مطالعه</th>
               <th style="padding:12px;text-align:center;">ساعات مطالعه</th>
-              <th style="padding:12px;text-align:center;">ثبت تست</th>
               <th style="padding:12px;text-align:center;border-radius:8px 0 0 8px;">ساعات تست</th>
             </tr>
           </thead>
@@ -460,10 +486,8 @@
               <tr style="background:${i%2===0 ? '#fafaff' : '#f3f4ff'};">
                 <td style="padding:12px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
                 <td style="padding:12px;border-bottom:1px solid #e5e7eb;font-weight:bold;">${escapeHtml(c.name)}</td>
-                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;">${c.logs.length}</td>
-                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:bold;">${toPersianNum(Math.round(c.hours*100)/100)} ساعت</td>
-                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;">${toPersianNum(c.testLogs.length)}</td>
-                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0f766e;font-weight:bold;">${toPersianNum(Math.round(c.testHours*100)/100)} ساعت</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:bold;"><bdi dir="ltr">${formatHours(c.hours)}</bdi> ساعت</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0f766e;font-weight:bold;"><bdi dir="ltr">${formatHours(c.testHours)}</bdi> ساعت</td>
               </tr>
             `).join('')}
           </tbody>
