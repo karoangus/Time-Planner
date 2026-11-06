@@ -86,7 +86,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
         <p class="text-gray-500 text-sm mb-1">تعداد دروس</p>
         <p id="stat-courses" class="text-3xl font-bold text-indigo-600">0</p>
@@ -95,7 +95,11 @@
         <p class="text-gray-500 text-sm mb-1">کل ساعات مطالعه</p>
         <p id="stat-total-hours" class="text-3xl font-bold text-amber-600">0</p>
       </div>
-      <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in col-span-2 md:col-span-1">
+      <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
+        <p class="text-gray-500 text-sm mb-1">کل ساعات تست</p>
+        <p id="stat-total-test-hours" class="text-3xl font-bold text-teal-600">0</p>
+      </div>
+      <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
         <p class="text-gray-500 text-sm mb-1">تاریخ امروز</p>
         <p id="stat-date" class="text-lg font-bold text-purple-600"></p>
       </div>
@@ -177,7 +181,11 @@
     function loadCourses() {
       try {
         const data = localStorage.getItem(STORAGE_KEY);
-        courses = data ? JSON.parse(data) : [];
+        courses = data ? JSON.parse(data).map(c => ({
+          ...c,
+          testHours: c.testHours ?? 0,
+          testLogs: c.testLogs ?? []
+        })) : [];
       } catch (e) {
         courses = [];
       }
@@ -244,7 +252,7 @@
         showToast('این درس قبلاً ثبت شده', 'error');
         return;
       }
-      courses.push({ id: Date.now().toString(), name, hours: 0, logs: [] });
+      courses.push({ id: Date.now().toString(), name, hours: 0, logs: [], testHours: 0, testLogs: [] });
       saveCourses();
       input.value = '';
       render();
@@ -262,21 +270,24 @@
       });
     }
 
-    function addHours(id) {
-      const input = document.getElementById(`hrs-${id}`);
-      const val = parseFloat(input.value);
-      if (isNaN(val) || val <= 0) {
-        showToast('لطفاً یک عدد مثبت وارد کن', 'error');
+    function addHours(id, type = 'study') {
+      const isTest = type === 'test';
+      const input = document.getElementById(`${isTest ? 'test-hrs' : 'hrs'}-${id}`);
+      const val = Number(input.value);
+      if (!Number.isFinite(val) || val < 0.01 || Math.abs(Math.round(val * 100) - val * 100) > 1e-8) {
+        showToast('لطفاً عددی حداقل ۰.۰۱ با حداکثر دو رقم اعشار وارد کن', 'error');
         return;
       }
       const c = courses.find(x => x.id === id);
       if (!c) return;
-      c.hours = Math.round((c.hours + val) * 100) / 100;
-      c.logs.push({ date: new Date().toISOString(), amount: val });
+      const hoursKey = isTest ? 'testHours' : 'hours';
+      const logsKey = isTest ? 'testLogs' : 'logs';
+      c[hoursKey] = Math.round((c[hoursKey] + val) * 100) / 100;
+      c[logsKey].push({ date: new Date().toISOString(), amount: val });
       saveCourses();
       input.value = '';
       render();
-      showToast(`${toPersianNum(val)} ساعت به «${c.name}» اضافه شد`, 'success');
+      showToast(`${toPersianNum(val)} ساعت ${isTest ? 'تست' : 'مطالعه'} به «${c.name}» اضافه شد`, 'success');
     }
 
     function endWeek() {
@@ -284,8 +295,8 @@
         showToast('هیچ درسی ثبت نشده است', 'error');
         return;
       }
-      openModal('اتمام هفته', 'این کار ساعات مطالعه همهٔ دروس را صفر می‌کند (خود دروس باقی می‌مانند). آیا مطمئنی؟', () => {
-        courses.forEach(c => { c.hours = 0; c.logs = []; });
+      openModal('اتمام هفته', 'این کار ساعات مطالعه و تست همهٔ دروس را صفر می‌کند (خود دروس باقی می‌مانند). آیا مطمئنی؟', () => {
+        courses.forEach(c => { c.hours = 0; c.logs = []; c.testHours = 0; c.testLogs = []; });
         saveCourses();
         render();
         showToast('هفتهٔ جدید مبارک! ساعات صفر شدند 🎉', 'success');
@@ -313,30 +324,49 @@
                 </div>
                 <div>
                   <h3 class="text-lg font-bold text-gray-800">${escapeHtml(c.name)}</h3>
-                  <p class="text-sm text-gray-500">${toPersianNum(c.logs.length)} ثبت مطالعه</p>
+                  <p class="text-sm text-gray-500">${toPersianNum(c.logs.length)} ثبت مطالعه · ${toPersianNum(c.testLogs.length)} ثبت تست</p>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <div class="hours-badge text-white px-4 py-2 rounded-xl font-bold shadow">
-                  ⏱ ${toPersianNum(c.hours)} ساعت
+                  ⏱ ${toPersianNum(c.hours)} ساعت مطالعه
+                </div>
+                <div class="bg-teal-500 text-white px-4 py-2 rounded-xl font-bold shadow">
+                  📝 ${toPersianNum(c.testHours)} ساعت تست
                 </div>
                 <button onclick="deleteCourse('${c.id}')" class="w-10 h-10 rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition flex items-center justify-center font-bold" title="حذف درس">
                   🗑
                 </button>
               </div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2 mb-2">
               <input
                 type="number"
                 id="hrs-${c.id}"
-                placeholder="میزان ساعت (مثلاً ۱.۵)"
-                step="0.25"
-                min="0.25"
+                placeholder="ساعت مطالعه (مثلاً ۱.۵)"
+                aria-label="ساعت مطالعه"
+                step="0.01"
+                min="0.01"
                 class="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors"
                 onkeydown="if(event.key==='Enter') addHours('${c.id}')"
               />
               <button onclick="addHours('${c.id}')" class="btn-primary text-white font-semibold px-5 py-2 rounded-xl">
-                ➕ افزودن ساعت
+                ➕ ثبت مطالعه
+              </button>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input
+                type="number"
+                id="test-hrs-${c.id}"
+                placeholder="ساعت تست (مثلاً ۱.۵)"
+                aria-label="ساعت تست"
+                step="0.01"
+                min="0.01"
+                class="flex-1 min-w-0 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-teal-500 focus:outline-none transition-colors"
+                onkeydown="if(event.key==='Enter') addHours('${c.id}', 'test')"
+              />
+              <button onclick="addHours('${c.id}', 'test')" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-5 py-2 rounded-xl transition">
+                ➕ ثبت تست
               </button>
             </div>
           `;
@@ -348,6 +378,8 @@
       document.getElementById('stat-courses').textContent = toPersianNum(courses.length);
       const total = courses.reduce((s, c) => s + c.hours, 0);
       document.getElementById('stat-total-hours').textContent = toPersianNum(Math.round(total * 100) / 100);
+      const totalTest = courses.reduce((s, c) => s + c.testHours, 0);
+      document.getElementById('stat-total-test-hours').textContent = toPersianNum(Math.round(totalTest * 100) / 100);
       document.getElementById('stat-date').textContent = todayStr();
     }
 
@@ -373,11 +405,6 @@
         showToast('هیچ درسی برای خروجی PDF ثبت نشده', 'error');
         return;
       }
-      const { jsPDF } = window.jspdf;
-      // Create PDF in LTR for jsPDF default font; we'll print English labels AND the Persian course names
-      // Since jsPDF default font doesn't support Persian, we'll generate an HTML canvas version using html2canvas-free approach:
-      // Simpler robust method: open a new printable window, print to PDF via browser? But user asked PDF button.
-      // We'll use html2canvas via CDN to render the report and add to PDF.
       ensureHtml2Canvas(() => {
         buildPDFViaCanvas();
       });
@@ -393,7 +420,9 @@
 
     function buildPDFViaCanvas() {
       // Build a hidden report element to render
+      const { jsPDF } = window.jspdf;
       const total = courses.reduce((s, c) => s + c.hours, 0);
+      const totalTest = courses.reduce((s, c) => s + c.testHours, 0);
       const report = document.createElement('div');
       report.style.cssText = 'position:fixed;top:-10000px;right:0;width:800px;padding:40px;background:#fff;font-family:Vazirmatn,Tahoma,sans-serif;direction:rtl;color:#111;';
       report.innerHTML = `
@@ -410,14 +439,20 @@
             <div style="color:#92400e;font-size:14px;">کل ساعات مطالعه</div>
             <div style="font-size:24px;font-weight:bold;color:#92400e;">${Math.round(total*100)/100} ساعت</div>
           </div>
+          <div style="flex:1;background:#ccfbf1;border-radius:12px;padding:16px;text-align:center;">
+            <div style="color:#115e59;font-size:14px;">کل ساعات تست</div>
+            <div style="font-size:24px;font-weight:bold;color:#115e59;">${toPersianNum(Math.round(totalTest*100)/100)} ساعت</div>
+          </div>
         </div>
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr style="background:#667eea;color:#fff;">
               <th style="padding:12px;text-align:right;border-radius:0 8px 8px 0;">#</th>
               <th style="padding:12px;text-align:right;">نام درس</th>
-              <th style="padding:12px;text-align:center;">تعداد ثبت</th>
-              <th style="padding:12px;text-align:center;border-radius:8px 0 0 8px;">ساعات مطالعه</th>
+              <th style="padding:12px;text-align:center;">ثبت مطالعه</th>
+              <th style="padding:12px;text-align:center;">ساعات مطالعه</th>
+              <th style="padding:12px;text-align:center;">ثبت تست</th>
+              <th style="padding:12px;text-align:center;border-radius:8px 0 0 8px;">ساعات تست</th>
             </tr>
           </thead>
           <tbody>
@@ -426,7 +461,9 @@
                 <td style="padding:12px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
                 <td style="padding:12px;border-bottom:1px solid #e5e7eb;font-weight:bold;">${escapeHtml(c.name)}</td>
                 <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;">${c.logs.length}</td>
-                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:bold;">${Math.round(c.hours*100)/100} ساعت</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:bold;">${toPersianNum(Math.round(c.hours*100)/100)} ساعت</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;">${toPersianNum(c.testLogs.length)}</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0f766e;font-weight:bold;">${toPersianNum(Math.round(c.testHours*100)/100)} ساعت</td>
               </tr>
             `).join('')}
           </tbody>
