@@ -39,42 +39,78 @@ function app(initial = []) {
     run: code => vm.runInContext(code, context) };
 }
 
-test('old courses are retained; study and test hours are independently persisted and displayed', () => {
+test('quarter-hour controls increment, decrement and keep study and test selections separate', () => {
   const a = app([{ id: '1', name: 'ریاضی', hours: 2, logs: [{ amount: 2 }] }]);
-  assert.equal(a.elements.get('stat-total-test-hours').textContent, '۰');
-  a.elements.set('test-hrs-1', { value: '1.5' });
+  assert.equal(a.elements.get('stat-total-test-hours').textContent, '۰:۰۰');
+  const card = a.elements.get('coursesContainer').children[0].innerHTML;
+  assert.doesNotMatch(card, /تعداد ثبت|ثبت مطالعه ·|ثبت تست<\/p>/);
+  assert.doesNotMatch(card, /type="number"/);
+  a.run("adjustMinutes('1', 'test', -15)");
+  assert.equal(a.elements.get('duration-test-1').textContent, '۰:۰۰');
+  assert.equal(a.elements.get('minus-test-1').disabled, true);
+  for (let i = 0; i < 10; i++) a.run("adjustMinutes('1', 'test', 15)");
+  assert.equal(a.elements.get('duration-test-1').textContent, '۲:۳۰');
+  a.run("adjustMinutes('1', 'test', -15)");
+  assert.equal(a.elements.get('duration-test-1').textContent, '۲:۱۵');
+  a.run("adjustMinutes('1', 'study', 15)");
   a.run("addHours('1', 'test')");
   assert.equal(a.stored()[0].hours, 2);
-  assert.equal(a.stored()[0].testHours, 1.5);
+  assert.equal(a.stored()[0].testHours, 2.25);
   assert.equal(a.stored()[0].testLogs.length, 1);
-  assert.equal(a.elements.get('stat-total-test-hours').textContent, '۱.۵');
-  a.elements.set('hrs-1', { value: '0.25' });
-  a.run("addHours('1')");
+  assert.equal(a.elements.get('stat-total-test-hours').textContent, '۲:۱۵');
+  a.run("addHours('1', 'study')");
   assert.equal(a.stored()[0].hours, 2.25);
-  assert.equal(a.stored()[0].testHours, 1.5);
+  assert.equal(a.stored()[0].testHours, 2.25);
   const reloaded = app(a.stored());
-  assert.equal(reloaded.elements.get('stat-total-test-hours').textContent, '۱.۵');
+  assert.equal(reloaded.elements.get('stat-total-test-hours').textContent, '۲:۱۵');
 });
 
-test('invalid test hours are rejected and ending the week resets both types but keeps courses', () => {
+test('zero or non-quarter-hour selection cannot be registered, week reset keeps courses', () => {
   const a = app([{ id: '1', name: 'ریاضی', hours: 2, logs: [{}], testHours: 1, testLogs: [{}] }]);
-  for (const value of ['', '-1', '0', '1.234', 'Infinity']) {
-    a.elements.set('test-hrs-1', { value });
-    a.run("addHours('1', 'test')");
-    assert.equal(a.stored()[0].testHours, 1);
-  }
+  a.run("addHours('1', 'test')");
+  a.run("adjustMinutes('1', 'test', 5)");
+  a.run("addHours('1', 'test')");
+  assert.equal(a.stored()[0].testHours, 1);
+  a.run("adjustMinutes('1', 'test', 15)");
   a.run('endWeek()');
   assert.match(a.elements.get('confirmMsg').textContent, /مطالعه و تست/);
   a.elements.get('confirmOk').click();
   assert.deepEqual(a.stored(), [{ id: '1', name: 'ریاضی', hours: 0, logs: [], testHours: 0, testLogs: [] }]);
+  a.run("addHours('1', 'test')");
+  assert.equal(a.stored()[0].testHours, 0);
 });
 
-test('PDF report includes test hours and can be saved', async () => {
-  const a = app([{ id: '1', name: 'ریاضی', hours: 2, logs: [{}], testHours: 1.5, testLogs: [{}] }]);
+test('new courses start at zero; selections roll over and totals add across courses', () => {
+  const a = app([{ id: '1', name: 'ریاضی', hours: 0.75, logs: [], testHours: 0.25, testLogs: [] }]);
+  a.elements.get('courseNameInput').value = 'فیزیک';
+  a.run('addCourse()');
+  const id = a.stored()[1].id;
+  for (let i = 0; i < 9; i++) a.run(`adjustMinutes('${id}', 'study', 15)`);
+  assert.equal(a.elements.get(`duration-study-${id}`).textContent, '۲:۱۵');
+  a.run(`addHours('${id}', 'study')`);
+  assert.equal(a.stored()[1].hours, 2.25);
+  assert.equal(a.elements.get('stat-total-hours').textContent, '۳:۰۰');
+  assert.equal(a.elements.get('stat-total-test-hours').textContent, '۰:۱۵');
+});
+
+test('legacy decimal data remains intact and displays in hours and minutes', () => {
+  const a = app([{ id: '1', name: 'ریاضی', hours: 1.08, logs: [{}], testHours: 2.75, testLogs: [{}] }]);
+  assert.equal(a.elements.get('stat-total-hours').textContent, '۱:۰۵');
+  assert.equal(a.elements.get('stat-total-test-hours').textContent, '۲:۴۵');
+  a.run("adjustMinutes('1', 'study', 15)");
+  a.run("addHours('1', 'study')");
+  assert.equal(a.stored()[0].hours, 1.33);
+  assert.equal(a.elements.get('stat-total-hours').textContent, '۱:۲۰');
+});
+
+test('PDF uses hour:minute format for totals and courses without registration counts', async () => {
+  const a = app([{ id: '1', name: 'ریاضی', hours: 2.25, logs: [{}], testHours: 1.5, testLogs: [{}] }]);
   a.run('exportPDF()');
-  assert.match(a.reports[0].innerHTML, /کل ساعات تست/);
-  assert.match(a.reports[0].innerHTML, /ثبت تست/);
-  assert.match(a.reports[0].innerHTML, /۱\.۵ ساعت/);
+  const report = a.reports[0].innerHTML;
+  assert.match(report, /کل ساعات تست/);
+  assert.match(report, /۲:۱۵/);
+  assert.match(report, /۱:۳۰/);
+  assert.doesNotMatch(report, /ثبت مطالعه|ثبت تست|تعداد ثبت/);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(a.savedPdf(), true);
 });
