@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>پلنر مطالعه — Time Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Vazirmatn', sans-serif; }
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .glass {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+    }
+    .course-card {
+      transition: all 0.3s ease;
+    }
+    .course-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-in { animation: slideIn 0.3s ease-out; }
+
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateX(50px); }
+    }
+    .fade-out { animation: fadeOut 0.3s ease-out forwards; }
+
+    .toast {
+      animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-out 2.7s forwards;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      transition: all 0.2s ease;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+      transition: all 0.2s ease;
+    }
+    .btn-danger:hover {
+      box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+      transition: all 0.2s ease;
+    }
+    .btn-success:hover {
+      box-shadow: 0 8px 20px rgba(5, 150, 105, 0.4);
+      transform: translateY(-1px);
+    }
+    .hours-badge {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    }
+  </style>
+</head>
+<body class="py-8 px-4">
+  <div class="max-w-4xl mx-auto">
+
+    <!-- Header -->
+    <div class="text-center mb-8 slide-in">
+      <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-2 drop-shadow-lg">📚 پلنر مطالعه</h1>
+      <p class="text-white/90 text-lg">ساعات مطالعه‌ات رو مدیریت کن، در پایان هفته گزارش بگیر</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+      <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
+        <p class="text-gray-500 text-sm mb-1">تعداد دروس</p>
+        <p id="stat-courses" class="text-3xl font-bold text-indigo-600">0</p>
+      </div>
+      <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in">
+        <p class="text-gray-500 text-sm mb-1">کل ساعات مطالعه</p>
+        <p id="stat-total-hours" class="text-3xl font-bold text-amber-600">0</p>
+      </div>
+      <div class="glass rounded-2xl p-4 shadow-lg text-center slide-in col-span-2 md:col-span-1">
+        <p class="text-gray-500 text-sm mb-1">تاریخ امروز</p>
+        <p id="stat-date" class="text-lg font-bold text-purple-600"></p>
+      </div>
+    </div>
+
+    <!-- Add Course Form -->
+    <div class="glass rounded-2xl p-6 shadow-xl mb-6 slide-in">
+      <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <span>➕</span> افزودن درس جدید
+      </h2>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <input
+          type="text"
+          id="courseNameInput"
+          placeholder="نام درس (مثلاً: ریاضی)"
+          class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors text-gray-700"
+          maxlength="50"
+        />
+        <button
+          onclick="addCourse()"
+          class="btn-primary text-white font-semibold px-8 py-3 rounded-xl shadow-md"
+        >
+          ✅ ثبت درس
+        </button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-6">
+      <button
+        onclick="exportPDF()"
+        class="btn-success text-white font-semibold px-6 py-3 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2"
+      >
+        <span>📄</span> خروجی PDF گزارش
+      </button>
+      <button
+        onclick="endWeek()"
+        class="btn-danger text-white font-semibold px-6 py-3 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2"
+      >
+        <span>🔄</span> اتمام هفته (صفر کردن ساعات)
+      </button>
+    </div>
+
+    <!-- Courses List -->
+    <div id="coursesContainer" class="space-y-4 mb-8">
+      <!-- Courses injected here -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="glass rounded-2xl p-12 shadow-xl text-center hidden">
+      <div class="text-6xl mb-4">📖</div>
+      <h3 class="text-xl font-bold text-gray-700 mb-2">هنوز درسی ثبت نشده</h3>
+      <p class="text-gray-500">از فرم بالا اولین درست رو اضافه کن!</p>
+    </div>
+
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-6 left-6 z-50 space-y-2"></div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="fixed inset-0 bg-black/50 z-40 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl slide-in">
+      <h3 id="confirmTitle" class="text-xl font-bold text-gray-800 mb-2">تأیید عملیات</h3>
+      <p id="confirmMsg" class="text-gray-600 mb-6">مطمئنی؟</p>
+      <div class="flex gap-3 justify-end">
+        <button onclick="closeModal()" class="px-6 py-2 rounded-xl bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition">انصراف</button>
+        <button id="confirmOk" class="px-6 py-2 rounded-xl btn-danger text-white font-semibold">تأیید</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Storage ----------
+    const STORAGE_KEY = 'time_planner_courses_v1';
+    let courses = [];
+    let pendingConfirm = null;
+
+    function loadCourses() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        courses = data ? JSON.parse(data) : [];
+      } catch (e) {
+        courses = [];
+      }
+    }
+    function saveCourses() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
+    }
+
+    // ---------- Helpers ----------
+    function toPersianNum(n) {
+      const map = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+      return String(n).replace(/\d/g, d => map[+d]);
+    }
+
+    function todayStr() {
+      const d = new Date();
+      const faDate = new Intl.DateTimeFormat('fa-IR', {
+        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+      }).format(d);
+      return faDate;
+    }
+
+    function showToast(msg, type = 'success') {
+      const colors = {
+        success: 'bg-emerald-500',
+        error: 'bg-red-500',
+        info: 'bg-indigo-500'
+      };
+      const t = document.createElement('div');
+      t.className = `toast ${colors[type]} text-white px-5 py-3 rounded-xl shadow-lg font-medium`;
+      t.textContent = msg;
+      document.getElementById('toastContainer').appendChild(t);
+      setTimeout(() => t.remove(), 3100);
+    }
+
+    function openModal(title, msg, onConfirm) {
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMsg').textContent = msg;
+      pendingConfirm = onConfirm;
+      const m = document.getElementById('confirmModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+    function closeModal() {
+      const m = document.getElementById('confirmModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+      pendingConfirm = null;
+    }
+    document.getElementById('confirmOk').addEventListener('click', () => {
+      if (pendingConfirm) pendingConfirm();
+      closeModal();
+    });
+
+    // ---------- Course operations ----------
+    function addCourse() {
+      const input = document.getElementById('courseNameInput');
+      const name = input.value.trim();
+      if (!name) {
+        showToast('لطفاً نام درس را وارد کن', 'error');
+        return;
+      }
+      if (courses.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+        showToast('این درس قبلاً ثبت شده', 'error');
+        return;
+      }
+      courses.push({ id: Date.now().toString(), name, hours: 0, logs: [] });
+      saveCourses();
+      input.value = '';
+      render();
+      showToast(`درس «${name}» با موفقیت اضافه شد`, 'success');
+    }
+
+    function deleteCourse(id) {
+      const c = courses.find(x => x.id === id);
+      if (!c) return;
+      openModal('حذف درس', `آیا از حذف درس «${c.name}» مطمئنی؟ تمام ساعات ثبت شده آن هم پاک می‌شود.`, () => {
+        courses = courses.filter(x => x.id !== id);
+        saveCourses();
+        render();
+        showToast('درس حذف شد', 'info');
+      });
+    }
+
+    function addHours(id) {
+      const input = document.getElementById(`hrs-${id}`);
+      const val = parseFloat(input.value);
+      if (isNaN(val) || val <= 0) {
+        showToast('لطفاً یک عدد مثبت وارد کن', 'error');
+        return;
+      }
+      const c = courses.find(x => x.id === id);
+      if (!c) return;
+      c.hours = Math.round((c.hours + val) * 100) / 100;
+      c.logs.push({ date: new Date().toISOString(), amount: val });
+      saveCourses();
+      input.value = '';
+      render();
+      showToast(`${toPersianNum(val)} ساعت به «${c.name}» اضافه شد`, 'success');
+    }
+
+    function endWeek() {
+      if (courses.length === 0) {
+        showToast('هیچ درسی ثبت نشده است', 'error');
+        return;
+      }
+      openModal('اتمام هفته', 'این کار ساعات مطالعه همهٔ دروس را صفر می‌کند (خود دروس باقی می‌مانند). آیا مطمئنی؟', () => {
+        courses.forEach(c => { c.hours = 0; c.logs = []; });
+        saveCourses();
+        render();
+        showToast('هفتهٔ جدید مبارک! ساعات صفر شدند 🎉', 'success');
+      });
+    }
+
+    // ---------- Render ----------
+    function render() {
+      const container = document.getElementById('coursesContainer');
+      const empty = document.getElementById('emptyState');
+      container.innerHTML = '';
+
+      if (courses.length === 0) {
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        courses.forEach(c => {
+          const card = document.createElement('div');
+          card.className = 'course-card glass rounded-2xl p-5 shadow-lg slide-in';
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-2xl shadow">
+                  📘
+                </div>
+                <div>
+                  <h3 class="text-lg font-bold text-gray-800">${escapeHtml(c.name)}</h3>
+                  <p class="text-sm text-gray-500">${toPersianNum(c.logs.length)} ثبت مطالعه</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="hours-badge text-white px-4 py-2 rounded-xl font-bold shadow">
+                  ⏱ ${toPersianNum(c.hours)} ساعت
+                </div>
+                <button onclick="deleteCourse('${c.id}')" class="w-10 h-10 rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition flex items-center justify-center font-bold" title="حذف درس">
+                  🗑
+                </button>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <input
+                type="number"
+                id="hrs-${c.id}"
+                placeholder="میزان ساعت (مثلاً ۱.۵)"
+                step="0.25"
+                min="0.25"
+                class="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors"
+                onkeydown="if(event.key==='Enter') addHours('${c.id}')"
+              />
+              <button onclick="addHours('${c.id}')" class="btn-primary text-white font-semibold px-5 py-2 rounded-xl">
+                ➕ افزودن ساعت
+              </button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      }
+
+      // Stats
+      document.getElementById('stat-courses').textContent = toPersianNum(courses.length);
+      const total = courses.reduce((s, c) => s + c.hours, 0);
+      document.getElementById('stat-total-hours').textContent = toPersianNum(Math.round(total * 100) / 100);
+      document.getElementById('stat-date').textContent = todayStr();
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    // Enter key on main input
+    document.getElementById('courseNameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addCourse();
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('confirmModal').addEventListener('click', e => {
+      if (e.target.id === 'confirmModal') closeModal();
+    });
+
+    // ---------- PDF Export ----------
+    function exportPDF() {
+      if (courses.length === 0) {
+        showToast('هیچ درسی برای خروجی PDF ثبت نشده', 'error');
+        return;
+      }
+      const { jsPDF } = window.jspdf;
+      // Create PDF in LTR for jsPDF default font; we'll print English labels AND the Persian course names
+      // Since jsPDF default font doesn't support Persian, we'll generate an HTML canvas version using html2canvas-free approach:
+      // Simpler robust method: open a new printable window, print to PDF via browser? But user asked PDF button.
+      // We'll use html2canvas via CDN to render the report and add to PDF.
+      ensureHtml2Canvas(() => {
+        buildPDFViaCanvas();
+      });
+    }
+
+    function ensureHtml2Canvas(cb) {
+      if (window.html2canvas) { cb(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = cb;
+      document.head.appendChild(s);
+    }
+
+    function buildPDFViaCanvas() {
+      // Build a hidden report element to render
+      const total = courses.reduce((s, c) => s + c.hours, 0);
+      const report = document.createElement('div');
+      report.style.cssText = 'position:fixed;top:-10000px;right:0;width:800px;padding:40px;background:#fff;font-family:Vazirmatn,Tahoma,sans-serif;direction:rtl;color:#111;';
+      report.innerHTML = `
+        <div style="text-align:center;border-bottom:2px solid #667eea;padding-bottom:20px;margin-bottom:24px;">
+          <h1 style="font-size:28px;color:#4c1d95;margin:0;">گزارش مطالعه هفتگی</h1>
+          <p style="color:#555;margin-top:8px;">${todayStr()}</p>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:24px;">
+          <div style="flex:1;background:#eef2ff;border-radius:12px;padding:16px;text-align:center;">
+            <div style="color:#4c1d95;font-size:14px;">تعداد دروس</div>
+            <div style="font-size:24px;font-weight:bold;color:#4c1d95;">${courses.length}</div>
+          </div>
+          <div style="flex:1;background:#fef3c7;border-radius:12px;padding:16px;text-align:center;">
+            <div style="color:#92400e;font-size:14px;">کل ساعات مطالعه</div>
+            <div style="font-size:24px;font-weight:bold;color:#92400e;">${Math.round(total*100)/100} ساعت</div>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#667eea;color:#fff;">
+              <th style="padding:12px;text-align:right;border-radius:0 8px 8px 0;">#</th>
+              <th style="padding:12px;text-align:right;">نام درس</th>
+              <th style="padding:12px;text-align:center;">تعداد ثبت</th>
+              <th style="padding:12px;text-align:center;border-radius:8px 0 0 8px;">ساعات مطالعه</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${courses.map((c, i) => `
+              <tr style="background:${i%2===0 ? '#fafaff' : '#f3f4ff'};">
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;font-weight:bold;">${escapeHtml(c.name)}</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;">${c.logs.length}</td>
+                <td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:bold;">${Math.round(c.hours*100)/100} ساعت</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:32px;text-align:center;color:#6b7280;font-size:13px;border-top:1px dashed #d1d5db;padding-top:16px;">
+          تهیه شده توسط Time Planner 📚
+        </div>
+      `;
+      document.body.appendChild(report);
+
+      html2canvas(report, { scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+        document.body.removeChild(report);
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const imgW = pageW;
+        const imgH = (canvas.height * imgW) / canvas.width;
+
+        let heightLeft = imgH;
+        let position = 0;
+        pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+        heightLeft -= pageH;
+        while (heightLeft > 0) {
+          position = heightLeft - imgH;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+          heightLeft -= pageH;
+        }
+        const fname = `study-report-${new Date().toISOString().slice(0,10)}.pdf`;
+        pdf.save(fname);
+        showToast('PDF با موفقیت دانلود شد 📄', 'success');
+      }).catch(err => {
+        document.body.removeChild(report);
+        showToast('خطا در ساخت PDF', 'error');
+        console.error(err);
+      });
+    }
+
+    // ---------- Init ----------
+    loadCourses();
+    render();
+  </script>
+</body>
+</html>
