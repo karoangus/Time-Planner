@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
+const swSource = fs.readFileSync('service-worker.js', 'utf8');
+const swVersion = (swSource.match(/LP_APP_VERSION\s*=\s*'([^']+)'/) || [])[1];
 
 test('manifest and app shell assets exist, including correctly sized install icons', () => {
   assert.equal(manifest.start_url, './');
@@ -16,44 +18,79 @@ test('manifest and app shell assets exist, including correctly sized install ico
   }
   assert.ok(manifest.icons.some(icon => icon.purpose === 'maskable'));
   const html = fs.readFileSync('index.html', 'utf8');
-  assert.match(html, /manifest.webmanifest/);
+  assert.match(html, /manifest\.webmanifest/);
   assert.match(html, /apple-touch-icon/);
   assert.doesNotMatch(html, /https:\/\/(cdn|cdnjs|fonts\.google)/);
+  // ارجاع‌های کش‌شده با شماره‌نسخه همراه‌اند تا به‌روزرسانی‌ها واقعاً به دستگاه‌ها برسد
+  assert.ok(html.includes(`./css/offline.css?v=${swVersion}`));
+  assert.ok(html.includes(`./js/offline.js?v=${swVersion}`));
+  assert.ok(html.includes(`./pwa.js?v=${swVersion}`));
 });
 
-test('service worker precaches local assets and serves offline under a subpath', async () => {
+test('offline shell files exist and are referenced by the service worker', () => {
+  for (const file of ['offline.html', 'app-version.json', 'css/offline.css', 'js/offline.js', 'pwa.js']) {
+    assert.ok(fs.existsSync(file), `missing ${file}`);
+    assert.ok(swSource.includes(file), `service worker does not precache ${file}`);
+  }
+  assert.ok(swSource.includes("const CACHE_NAME = 'time-planner-v' + LP_APP_VERSION"), 'CACHE_NAME derives from the app version');
+  assert.match(swSource, /cache:\s*'reload'/, 'install must precache with { cache: \'reload\' }');
+  assert.match(swSource, /skipWaiting/);
+  assert.match(swSource, /clients\.claim/);
+});
+
+test('service worker precaches on install with reload, purges legacy caches, serves offline', async () => {
   const listeners = {};
+  class FakeRequest { constructor(url, opts) { this.url = url; this.cache = opts && opts.cache; } }
   const cache = {
     addAll: async files => {
-      for (const file of files) assert.ok(fs.existsSync(file), `missing ${file}`);
-      cache.files = files;
+      cache.files = files.map(f => (typeof f === 'string' ? f : f.url));
+      cache.modes = files.map(f => (typeof f === 'string' ? undefined : f.cache));
+      for (const file of cache.files) {
+        const path = file.split('?')[0];
+        assert.ok(fs.existsSync(path), `missing ${path}`);
+      }
     },
-    match: async request => typeof request === 'string' ? 'offline index' : 'cached asset'
+    match: async (request) => {
+      if (typeof request === 'string') return request === './offline.html' ? 'offline fallback' : 'offline index';
+      return 'cached asset';
+    }
   };
   const deleted = [];
   const caches = {
     open: async () => cache,
-    keys: async () => ['time-planner-shell-v0', 'time-planner-shell-v1', 'another-app'],
+    keys: async () => ['time-planner-shell-v1', 'time-planner-v0.9.0', `time-planner-v${swVersion}`, 'another-app'],
     delete: async key => deleted.push(key)
   };
   const self = { addEventListener: (name, cb) => { listeners[name] = cb; },
     location: { origin: 'https://example.com' }, registration: { scope: 'https://example.com/planner/' },
     skipWaiting: async () => {}, clients: { claim: async () => {} } };
-  const context = vm.createContext({ self, caches, URL, Promise, fetch: async () => { throw Error('offline'); } });
-  vm.runInContext(fs.readFileSync('service-worker.js', 'utf8'), context);
+  const context = vm.createContext({ self, caches, URL, Promise, Request: FakeRequest,
+    fetch: async () => { throw Error('offline'); },
+    Response: class { constructor(body, init) { this.body = body; this.status = (init && init.status) || 200; } } });
+  vm.runInContext(swSource, context);
   let task;
   listeners.install({ waitUntil: promise => { task = promise; } });
   await task;
   assert.ok(cache.files.includes('./assets/vendor/html2canvas.min.js'));
+  assert.ok(cache.files.includes('./offline.html'));
+  assert.ok(cache.files.includes(`./js/offline.js?v=${swVersion}`));
+  assert.ok(cache.modes.every(mode => mode === 'reload'), 'every precached request must bypass HTTP cache');
   listeners.activate({ waitUntil: promise => { task = promise; } });
   await task;
-  assert.deepEqual(deleted, ['time-planner-shell-v0']);
+  assert.deepEqual(deleted.sort(), ['time-planner-shell-v1', 'time-planner-v0.9.0']);
+
+  // ناوبری در حالت آفلاین → index.html ذخیره‌شده (نه خطای شبکه)
   let response;
   listeners.fetch({ request: { url: 'https://example.com/planner/', method: 'GET', mode: 'navigate' }, respondWith: promise => { response = promise; } });
   assert.equal(await response, 'offline index');
-  listeners.fetch({ request: { url: 'https://example.com/planner/assets/app.css', method: 'GET', mode: 'no-cors' }, respondWith: promise => { response = promise; } });
+  // فایل CSS در حالت آفلاین → از کش
+  listeners.fetch({ request: { url: 'https://example.com/planner/css/offline.css?v=' + swVersion, method: 'GET', mode: 'no-cors' }, respondWith: promise => { response = promise; } });
   assert.equal(await response, 'cached asset');
+  // درخواست غیر GET اصلاً مدیریت نمی‌شود
   response = null;
+  listeners.fetch({ request: { url: 'https://example.com/planner/', method: 'POST', mode: 'navigate' }, respondWith: promise => { response = promise; } });
+  assert.equal(response, null);
+  // مسیر بیرون از scope برنامه مدیریت نمی‌شود
   listeners.fetch({ request: { url: 'https://example.com/other/', method: 'GET', mode: 'navigate' }, respondWith: promise => { response = promise; } });
   assert.equal(response, null);
 });

@@ -12,8 +12,10 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="./assets/app.css" />
+  <link rel="stylesheet" href="./css/offline.css?v=1.0.0" />
   <script src="./assets/vendor/jspdf.umd.min.js"></script>
-  <script src="./pwa.js" defer></script>
+  <script src="./pwa.js?v=1.0.0" defer></script>
+  <script src="./js/offline.js?v=1.0.0" defer></script>
   <style>
     @font-face { font-family: 'Vazirmatn'; src: url('./assets/fonts/Vazirmatn-variable.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
     * { font-family: 'Vazirmatn', sans-serif; }
@@ -69,6 +71,14 @@
       box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
       transform: translateY(-1px);
     }
+    .btn-secondary {
+      background: linear-gradient(135deg, #64748b 0%, #334155 100%);
+      transition: all 0.2s ease;
+    }
+    .btn-secondary:hover {
+      box-shadow: 0 8px 20px rgba(51, 65, 85, 0.4);
+      transform: translateY(-1px);
+    }
     .btn-success {
       background: linear-gradient(135deg, #34d399 0%, #059669 100%);
       transition: all 0.2s ease;
@@ -83,13 +93,16 @@
   </style>
 </head>
 <body class="py-8 px-4">
+  <!-- Offline banner: only visible when navigator.onLine === false -->
+  <div id="offlineBanner" class="lp-offline-banner" role="status" hidden>📴 شما آفلاین هستید — نسخهٔ ذخیره‌شدهٔ برنامه روی همین دستگاه اجرا می‌شود</div>
   <div class="max-w-4xl mx-auto">
 
     <!-- Header -->
     <div class="text-center mb-8 slide-in">
       <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-2 drop-shadow-lg">📚 پلنر مطالعه</h1>
       <p class="text-white/90 text-lg">ساعات مطالعه‌ات رو مدیریت کن، در پایان هفته گزارش بگیر</p>
-      <button id="installApp" type="button" class="hidden mt-4 px-5 py-2 rounded-xl bg-white text-indigo-700 font-semibold shadow-md hover:bg-indigo-50 transition">📲 نصب برنامه</button>
+      <span id="offlineBadge" class="lp-offline-badge" hidden>📴 آفلاین</span>
+      <button id="installApp" type="button" class="hidden mt-4 px-5 py-2 rounded-xl bg-white text-indigo-700 font-semibold shadow-md hover:bg-indigo-50 transition">📲 نصب روی گوشی</button>
       <p id="installHelp" class="hidden mt-3 text-white text-sm">برای نصب در آیفون یا آیپد، از منوی اشتراک‌گذاری Safari گزینهٔ «Add to Home Screen» را انتخاب کن.</p>
     </div>
 
@@ -154,6 +167,75 @@
     <!-- Courses List -->
     <div id="coursesContainer" class="space-y-4 mb-8">
       <!-- Courses injected here -->
+    </div>
+
+    <!-- Settings & Offline readiness -->
+    <div id="settingsCard" class="glass rounded-2xl p-6 shadow-xl mb-8 slide-in">
+      <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <span>⚙️</span> تنظیمات و «آفلاین و اینترنت ملی»
+      </h2>
+
+      <div class="lp-offline-honest">
+        <p class="lp-offline-honest-title">📴 آفلاین و اینترنت ملی — صادقانه:</p>
+        <ul>
+          <li>در زمان «نت ملی» فقط سایت‌هایی که روی سرورهای داخل ایران میزبانی می‌شوند (معمولاً با دامنهٔ ‎.ir) باز می‌شوند؛ <b>github.io</b> و هر هاست خارجیِ دیگر در آن شرایط فیلتر است.</li>
+          <li>«ایرانی کردن دامنه» از داخل این برنامه ممکن نیست — ثبت دامنهٔ ‎.ir و هاست ایرانی فقط با حساب‌های خودتان نزد ثبت‌کننده‌های ایرانی امکان‌پذیر است.</li>
+          <li>اما برای <b>اجرای همین برنامه</b> به هیچ دامنه‌ای احتیاج نیست: یک‌بار آنلاین بازش کنید، دکمهٔ «✅ ذخیره آفلاین» را بزنید و بعد همیشه از آیکون روی صفحهٔ اصلی اجرا کنید؛ برای همیشه آفلاین می‌ماند.</li>
+          <li>داده‌ها روی خودِ همین دستگاه ذخیره می‌شود. برای اطمینان کامل، هر از گاهی فایل پشتیبان JSON بگیرید.</li>
+        </ul>
+      </div>
+
+      <div class="lp-status-grid">
+        <div class="lp-status-item">نسخهٔ برنامه<br /><b id="settingsVersion">…</b></div>
+        <div class="lp-status-item">وضعیت اتصال<br /><b id="onlineStatus">…</b></div>
+        <div class="lp-status-item">ذخیرهٔ دائمی (persist)<br /><b id="persistStatus">…</b></div>
+        <div class="lp-status-item">آخرین «ذخیره آفلاین»<br /><b id="offlineReadyAt">—</b></div>
+      </div>
+
+      <p id="updateHint" class="lp-update-hint" hidden>🔔 نسخهٔ جدیدتری از برنامه منتشر شده است — برای گرفتن آن صفحه را تازه کنید.</p>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button id="btnEnsureOffline" type="button" class="btn-primary text-white font-semibold px-5 py-3 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2">
+          <span>✅</span> ذخیره آفلاین روی این دستگاه
+        </button>
+        <button id="btnOfflineTest" type="button" class="btn-secondary text-white font-semibold px-5 py-3 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2">
+          <span>🧪</span> تست آفلاین
+        </button>
+        <button id="lpPerfToggle" type="button" aria-pressed="false" class="bg-white text-slate-700 font-semibold px-5 py-3 rounded-xl shadow-md flex items-center justify-center gap-2 hover:bg-slate-50 transition">
+          <span>⚡</span> حالت سبک
+        </button>
+      </div>
+
+      <details class="lp-install-help">
+        <summary>📲 راهنمای نصب روی گوشی (مثل یک برنامهٔ واقعی)</summary>
+        <ul>
+          <li><b>اندروید (کروم):</b> دکمهٔ «📲 نصب روی گوشی» بالای صفحه را بزنید؛ یا منوی ⋮ ← «Add to Home screen».</li>
+          <li><b>آیفون و آیپد (سافاری):</b> دکمهٔ اشتراک‌گذاری Safari ← «Add to Home Screen».</li>
+          <li><b>دسکتاپ (کروم / اج):</b> آیکون نصب (⊕) در نوار آدرس ← «Install».</li>
+          <li>پس از نصب، از همان آیکون وارد شوید؛ حتی در حالت نت ملی هم باز می‌شود.</li>
+        </ul>
+      </details>
+
+      <!-- Backup / Restore (data is stored per-origin; use this to move or protect your data) -->
+      <div class="lp-backup-row">
+        <p class="lp-backup-title">💾 پشتیبان‌گیری و انتقال داده (JSON)</p>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button
+            onclick="exportBackup()"
+            class="btn-secondary text-white font-semibold px-6 py-2 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2"
+          >
+            <span>💾</span> دریافت فایل پشتیبان
+          </button>
+          <button
+            onclick="document.getElementById('backupFileInput').click()"
+            class="bg-white text-slate-700 font-semibold px-6 py-2 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+          >
+            <span>📥</span> بازگردانی از فایل پشتیبان
+          </button>
+          <input type="file" id="backupFileInput" accept="application/json,.json" class="hidden" onchange="importBackup(this)" />
+        </div>
+        <p class="lp-backup-note">داده‌ها به هر آدرس (origin) جداگانه ذخیره می‌شوند؛ این فایل تنها راه انتقال امن داده بین آدرس‌های مختلف برنامه است.</p>
+      </div>
     </div>
 
     <!-- Empty State -->
@@ -525,6 +607,66 @@
         showToast('خطا در ساخت PDF', 'error');
         console.error(err);
       });
+    }
+
+    // ---------- Backup / Restore ----------
+    // localStorage is scoped to each origin, so data on the hosted site does not
+    // automatically move to the single-file offline copy (or to another host).
+    // These two helpers export the whole dataset as a JSON file and import it back.
+    function exportBackup() {
+      const payload = {
+        app: 'time-planner',
+        type: 'backup',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        courses
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `time-planner-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      showToast('فایل پشتیبان دانلود شد 💾', 'success');
+    }
+
+    function importBackup(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result));
+          const list = Array.isArray(data) ? data : data && data.courses;
+          if (!Array.isArray(list)) throw new Error('invalid backup');
+          const clean = list.map((c, i) => ({
+            id: String((c && c.id) != null ? c.id : Date.now() + i),
+            name: String((c && c.name) || '').trim() || `درس ${i + 1}`,
+            hours: Math.max(0, Number(c && c.hours) || 0),
+            logs: Array.isArray(c && c.logs) ? c.logs : [],
+            testHours: Math.max(0, Number(c && c.testHours) || 0),
+            testLogs: Array.isArray(c && c.testLogs) ? c.testLogs : []
+          }));
+          const msg = `تعداد ${toPersianNum(clean.length)} درس از فایل پشتیبان جایگزین داده‌های فعلی همین مرورگر می‌شود. ادامه می‌دهی؟`;
+          openModal('بازگردانی پشتیبان', msg, () => {
+            courses = clean;
+            selectedMinutes.clear();
+            saveCourses();
+            render();
+            showToast('پشتیبان با موفقیت بازگردانی شد ✅', 'success');
+          });
+        } catch (e) {
+          showToast('فایل پشتیبان معتبر نیست', 'error');
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.onerror = () => {
+        input.value = '';
+        showToast('خواندن فایل پشتیبان ناموفق بود', 'error');
+      };
+      reader.readAsText(file);
     }
 
     // ---------- Init ----------

@@ -1,0 +1,132 @@
+/* Time Planner — سبک‌های بخش آفلاین و تنظیمات (بدون وابستگی به Tailwind) */
+
+/* بنر آفلاین: فقط در حالت قطع اینترنت نمایش داده می‌شود (navigator.onLine === false) */
+.lp-offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  margin: -2rem -1rem 1rem;
+  padding: 0.6rem 1rem;
+  text-align: center;
+  font-weight: 800;
+  color: #451a03;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-bottom: 2px solid #d97706;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+}
+.lp-offline-banner[hidden] { display: none; }
+
+/* بج کوچک آفلاین در هدر */
+.lp-offline-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.15rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.45);
+}
+.lp-offline-badge[hidden] { display: none; }
+
+/* باکس صادقانهٔ «آفلاین و اینترنت ملی» */
+.lp-offline-honest {
+  border: 2px solid #fcd34d;
+  background: #fffbeb;
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  line-height: 2;
+}
+.lp-offline-honest-title {
+  font-weight: 800;
+  color: #92400e;
+  margin-bottom: 0.35rem;
+}
+.lp-offline-honest ul {
+  list-style: disc;
+  padding-right: 1.25rem;
+  font-size: 0.85rem;
+  color: #78350f;
+}
+.lp-offline-honest code, .lp-offline-honest b { color: #451a03; }
+
+/* گرید وضعیت‌ها */
+.lp-status-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 640px) {
+  .lp-status-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 900px) {
+  .lp-status-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.lp-status-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.9;
+}
+.lp-status-item b { color: #1e293b; font-size: 0.8rem; }
+
+/* نوار نسخهٔ جدید موجود است */
+.lp-update-hint {
+  font-size: 0.85rem;
+  color: #3730a3;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.lp-update-hint[hidden] { display: none; }
+
+/* راهنمای نصب */
+.lp-install-help {
+  margin-top: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: #334155;
+  line-height: 2;
+}
+.lp-install-help summary { font-weight: 700; cursor: pointer; }
+.lp-install-help ul { list-style: disc; padding-right: 1.25rem; margin-top: 0.4rem; }
+
+/* ردیف پشتیبان‌گیری */
+.lp-backup-row {
+  margin-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+.lp-backup-title {
+  font-weight: 700;
+  color: #334155;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.lp-backup-note {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 0.4rem;
+  line-height: 1.9;
+}
+
+/* حالت سبک: خاموش‌کردن بلورها برای گوشی‌های ضعیف */
+html.lp-perf .glass {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+}
+html.lp-perf .course-card { transition: none !important; }
+html.lp-perf .course-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,.08) !important; }
+html.lp-perf * { animation-duration: 0.01ms !important; }
