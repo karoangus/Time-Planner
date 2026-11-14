@@ -1,6 +1,6 @@
 # 📚 Time Planner (پلنر مطالعه)
 
-![نسخه](https://img.shields.io/badge/version-1.0.0-indigo) ![offline ready](https://img.shields.io/badge/offline-ready-brightgreen)
+![نسخه](https://img.shields.io/badge/version-1.1.0-indigo) ![offline ready](https://img.shields.io/badge/offline-ready-brightgreen)
 
 یک وب اپلیکیشن سبک و زیبا برای مدیریت ساعات مطالعه، به زبان فارسی — **کاملاً آفلاین**؛ مناسب استفاده حتی در حالت «اینترنت ملی».
 
@@ -76,6 +76,7 @@ npm run serve
 
 | نسخه | تاریخ | تغییرات |
 | --- | --- | --- |
+| **1.1.0** | ۱۴۰۵/۰۸/۱۹ | تثبیت آفلاین: `fetch` با `no-store` در شبکه‌اول، `display_override` در مانیفست، دکمهٔ «📲 نصب روی گوشی» داخل کارت تنظیمات (`lpTriggerInstall`/`lpCanInstall`)، متن وضعیت یک‌خطی `offlineStatusText` و `renderOfflineCard()`، کلاس‌های سازگار `offline-banner/badge/card/status`، لینک بازیابی در `offline.html`، CACHE_NAME = `time-planner-v1.1.0` |
 | **1.0.0** | ۱۴۰۵/۰۸/۱۹ | آفلاین واقعی (Service Worker نسخه‌بندی‌شده + precache کامل + fallback `offline.html`)، نصب روی گوشی، ذخیرهٔ دائمی `storage.persist()`، بنر/بج آفلاین، کارت «⚙️ تنظیمات» با دکمه‌های «✅ ذخیرهٔ آفلاین» و «🧪 تست آفلاین»، پشتیبان‌گیری/بازگردانی JSON، حالت سبک (`lp-perf`)، ساخت‌یافته با `package.json` / `app-version.json` |
 
 ## 🔧 بالا بردن نسخه (برای توسعه‌دهنده)

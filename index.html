@@ -12,10 +12,10 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="./assets/app.css" />
-  <link rel="stylesheet" href="./css/offline.css?v=1.0.0" />
+  <link rel="stylesheet" href="./css/offline.css?v=1.1.0" />
   <script src="./assets/vendor/jspdf.umd.min.js"></script>
-  <script src="./pwa.js?v=1.0.0" defer></script>
-  <script src="./js/offline.js?v=1.0.0" defer></script>
+  <script src="./pwa.js?v=1.1.0" defer></script>
+  <script src="./js/offline.js?v=1.1.0" defer></script>
   <style>
     @font-face { font-family: 'Vazirmatn'; src: url('./assets/fonts/Vazirmatn-variable.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
     * { font-family: 'Vazirmatn', sans-serif; }
@@ -94,14 +94,14 @@
 </head>
 <body class="py-8 px-4">
   <!-- Offline banner: only visible when navigator.onLine === false -->
-  <div id="offlineBanner" class="lp-offline-banner" role="status" hidden>📴 شما آفلاین هستید — نسخهٔ ذخیره‌شدهٔ برنامه روی همین دستگاه اجرا می‌شود</div>
+  <div id="offlineBanner" class="lp-offline-banner offline-banner" role="status" hidden>📴 شما آفلاین هستید — نسخهٔ ذخیره‌شدهٔ برنامه روی همین دستگاه اجرا می‌شود</div>
   <div class="max-w-4xl mx-auto">
 
     <!-- Header -->
     <div class="text-center mb-8 slide-in">
       <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-2 drop-shadow-lg">📚 پلنر مطالعه</h1>
       <p class="text-white/90 text-lg">ساعات مطالعه‌ات رو مدیریت کن، در پایان هفته گزارش بگیر</p>
-      <span id="offlineBadge" class="lp-offline-badge" hidden>📴 آفلاین</span>
+      <span id="offlineBadge" class="lp-offline-badge offline-badge" hidden>📴 آفلاین</span>
       <button id="installApp" type="button" class="hidden mt-4 px-5 py-2 rounded-xl bg-white text-indigo-700 font-semibold shadow-md hover:bg-indigo-50 transition">📲 نصب روی گوشی</button>
       <p id="installHelp" class="hidden mt-3 text-white text-sm">برای نصب در آیفون یا آیپد، از منوی اشتراک‌گذاری Safari گزینهٔ «Add to Home Screen» را انتخاب کن.</p>
     </div>
@@ -170,7 +170,7 @@
     </div>
 
     <!-- Settings & Offline readiness -->
-    <div id="settingsCard" class="glass rounded-2xl p-6 shadow-xl mb-8 slide-in">
+    <div id="settingsCard" class="glass offline-card rounded-2xl p-6 shadow-xl mb-8 slide-in">
       <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
         <span>⚙️</span> تنظیمات و «آفلاین و اینترنت ملی»
       </h2>
@@ -184,6 +184,8 @@
           <li>داده‌ها روی خودِ همین دستگاه ذخیره می‌شود. برای اطمینان کامل، هر از گاهی فایل پشتیبان JSON بگیرید.</li>
         </ul>
       </div>
+
+      <p id="offlineStatusText" class="offline-status">در حال بررسی وضعیت آفلاین…</p>
 
       <div class="lp-status-grid">
         <div class="lp-status-item">نسخهٔ برنامه<br /><b id="settingsVersion">…</b></div>
@@ -200,6 +202,9 @@
         </button>
         <button id="btnOfflineTest" type="button" class="btn-secondary text-white font-semibold px-5 py-3 rounded-xl shadow-md flex-1 flex items-center justify-center gap-2">
           <span>🧪</span> تست آفلاین
+        </button>
+        <button id="btnInstallApp" type="button" class="btn-success text-white font-semibold px-5 py-3 rounded-xl shadow-md flex items-center justify-center gap-2">
+          <span>📲</span> نصب روی گوشی
         </button>
         <button id="lpPerfToggle" type="button" aria-pressed="false" class="bg-white text-slate-700 font-semibold px-5 py-3 rounded-xl shadow-md flex items-center justify-center gap-2 hover:bg-slate-50 transition">
           <span>⚡</span> حالت سبک

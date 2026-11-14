@@ -115,3 +115,11 @@ test('lp-perf toggle flips the html class and persists the choice', async () => 
   assert.equal(env.localStorage.getItem('time_planner_lp_perf'), '0');
   assert.equal(env.documentElement._perf, false);
 });
+
+test('renderOfflineCard reports readiness once cache/persist are set and flips the install button', async () => {
+  const env = makeEnv({ cachedUrls: ['./'] });
+  await flush();
+  // caches.has برای کش نسخهٔ فعلی true است → متن آمادهٔ آفلاین
+  assert.match(env.elements.get('offlineStatusText').textContent, /آماده برای اجرای آفلاین|ذخیره/);
+  assert.match(env.elements.get('btnInstallApp').innerHTML, /نصب/);
+});
