@@ -1,6 +1,6 @@
-// Time Planner — آفلاین واقعی، ذخیرهٔ دائمی و وضعیت اتصال (نسخهٔ 1.0.0)
+// Time Planner — آفلاین واقعی، ذخیرهٔ دائمی و وضعیت اتصال (نسخهٔ 1.1.0)
 // این فایل هیچ وابستگی بیرونی ندارد؛ در بدترین حالت (نت ملی) از کش اجرا می‌شود.
-const LP_APP_VERSION = '1.0.0';
+const LP_APP_VERSION = '1.1.0';
 const LP_CACHE_NAME = 'time-planner-v' + LP_APP_VERSION;
 const LP_PERF_KEY = 'time_planner_lp_perf';
 const LP_READY_KEY = 'time_planner_offline_ready_at';
@@ -161,8 +161,7 @@ window.lpEnsureOfflineReady = async function lpEnsureOfflineReady() {
     }
 
     try { localStorage.setItem(LP_READY_KEY, new Date().toISOString()); } catch (_) {}
-    lpRenderOfflineReadyAt();
-    await lpRenderPersistStatus();
+    await renderOfflineCard();
 
     if (swReady && hasCache && cachedCount > 0) {
       lpToast(`برنامه روی این دستگاه ذخیره شد ✅ — ${toFaDigits(cachedCount)} فایل در کش${persisted ? ' + ذخیرهٔ دائمی فعال' : ''}`, 'success');
@@ -222,22 +221,98 @@ async function lpCheckVersion() {
   } catch (_) { /* آفلاین هستیم؛ نسخهٔ محلی معتبر است */ }
 }
 
+// ---------- نصب PWA (lpCanInstall / lpTriggerInstall) ----------
+let lpDeferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  lpDeferredInstallPrompt = event;
+  renderOfflineCard();
+});
+window.addEventListener('appinstalled', () => {
+  lpDeferredInstallPrompt = null;
+  renderOfflineCard();
+});
+
+const lpIsStandalone = () => Boolean(
+  (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+  (window.navigator && window.navigator.standalone === true)
+);
+const lpIsIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+window.lpCanInstall = function lpCanInstall() {
+  return !lpIsStandalone();
+};
+
+window.lpTriggerInstall = async function lpTriggerInstall() {
+  if (lpIsStandalone()) {
+    lpToast('برنامه همین حالا نصب شده و از آیکون اجرا می‌شود ✅', 'info');
+    renderOfflineCard();
+    return;
+  }
+  if (lpDeferredInstallPrompt) {
+    const promptEvent = lpDeferredInstallPrompt;
+    lpDeferredInstallPrompt = null;
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+    } catch (e) {
+      console.warn('install prompt failed:', e);
+    }
+    renderOfflineCard();
+    return;
+  }
+  // مرورگرهای بدون beforeinstallprompt (مثل سافاری iOS): راهنمای دستی
+  if (lpIsIOS()) {
+    lpSetHidden('installHelp', false);
+    lpToast('آیفون/آیپد: Safari ← دکمهٔ اشتراک‌گذاری ← «Add to Home Screen»', 'info');
+    return;
+  }
+  lpToast('از منوی مرورگر «Install app» یا «Add to Home screen» را بزنید', 'info');
+};
+
+// نام مستعار سازگار با پرامپت اصلی
+window.ensurePersist = lpPersistStorage;
+
+// ---------- کارت وضعیت آفلاین (کش + پایداری + نصب) ----------
+async function renderOfflineCard() {
+  lpRenderOnlineStatus();
+  await lpRenderPersistStatus();
+  lpRenderOfflineReadyAt();
+  const t = document.getElementById('offlineStatusText');
+  if (t) {
+    let cacheOk = false;
+    try { cacheOk = window.caches ? await caches.has(LP_CACHE_NAME) : false; } catch (_) { cacheOk = false; }
+    const persisted = localStorage.getItem(LP_PERSIST_KEY) === '1';
+    t.textContent = cacheOk
+      ? '✅ آماده برای اجرای آفلاین' + (persisted ? ' — ذخیرهٔ دائمی فعال' : '')
+      : (navigator.onLine !== false
+          ? '⬆️ یک‌بار «ذخیره آفلاین» را بزنید تا برای نت ملی آماده شود'
+          : '❌ هنوز ذخیره نشده — اتصال را برقرار و «ذخیره آفلاین» را بزنید');
+    t.style.color = cacheOk ? '#047857' : '#b45309';
+  }
+  const installBtn = document.getElementById('btnInstallApp');
+  if (installBtn) {
+    installBtn.innerHTML = lpIsStandalone() ? '<span>✅</span> نصب شده است' : '<span>📲</span> نصب روی گوشی';
+  }
+}
+window.renderOfflineCard = renderOfflineCard;
+
 // ---------- راه‌اندازی ----------
 function lpInit() {
   const v = document.getElementById('settingsVersion');
   if (v) v.textContent = 'v' + LP_APP_VERSION;
 
-  lpRenderOnlineStatus();
-  lpRenderPersistStatus();
-  lpRenderOfflineReadyAt();
   lpApplyPerf(localStorage.getItem(LP_PERF_KEY) === '1');
 
   document.getElementById('btnEnsureOffline')?.addEventListener('click', window.lpEnsureOfflineReady);
   document.getElementById('btnOfflineTest')?.addEventListener('click', window.lpTestOffline);
+  document.getElementById('btnInstallApp')?.addEventListener('click', window.lpTriggerInstall);
   document.getElementById('lpPerfToggle')?.addEventListener('click', lpTogglePerf);
 
+  renderOfflineCard();
   // تلاش ملایم برای ذخیرهٔ دائمی (نتیجه در کارت تنظیمات نمایش داده می‌شود)
-  lpPersistStorage().then(() => lpRenderPersistStatus());
+  lpPersistStorage().then(() => renderOfflineCard());
 
   lpCheckVersion();
 }

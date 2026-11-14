@@ -1,10 +1,10 @@
-// Time Planner — سرویس‌ورکر آفلاین (v1.0.0)
+// Time Planner — سرویس‌ورکر آفلاین (v1.1.0)
 // استراتژی:
 //   • صفحات/CSS/JS/JSON → network-first با fallback به کش (آخرین نسخهٔ آنلاین؛ اگر نت نبود نسخهٔ ذخیره‌شده)
 //   • تصاویر/فونت/صوت → cache-first (سریع و پایدار)
 //   • نصب (install) با { cache: 'reload' } تا کش همیشه از شبکهٔ تازه پر شود + skipWaiting و claim
 //   • ناوبری‌های بدون کش → offline.html (صفحهٔ fallback کاملاً مستقل)
-const LP_APP_VERSION = '1.0.0';
+const LP_APP_VERSION = '1.1.0';
 const CACHE_NAME = 'time-planner-v' + LP_APP_VERSION;
 const V = '?v=' + LP_APP_VERSION;
 const APP_SHELL = [
@@ -43,7 +43,8 @@ self.addEventListener('activate', event => {
 async function networkFirst(request, isNavigation) {
   const cache = await caches.open(CACHE_NAME);
   try {
-    const response = await fetch(request);
+    // no-store تا نسخهٔ تازه همیشه از شبکه بیاید (نه از HTTP cache مرورگر)
+    const response = await fetch(request, { cache: 'no-store' });
     putInCache(cache, request, response);
     return response;
   } catch (error) {

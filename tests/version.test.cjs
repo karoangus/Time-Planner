@@ -49,3 +49,21 @@ test('index.html wires banner, badge and settings card with the expected ids', (
   }
   assert.ok(sw.includes('./offline.html'), 'fallback page must be precached');
 });
+
+test('v1.1.0 additions: display_override, offline-card wiring, no-store fetch, install helpers', () => {
+  const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
+  assert.deepEqual(manifest.display_override, ['standalone', 'minimal-ui']);
+  assert.match(sw, /cache:\s*'no-store'/, 'network-first fetch must bypass the HTTP cache');
+  for (const token of ['lpTriggerInstall', 'lpCanInstall', 'renderOfflineCard', 'ensurePersist']) {
+    assert.ok(offlineJs.includes(token), `js/offline.js must define ${token}`);
+  }
+  for (const id of ['offlineStatusText', 'btnInstallApp']) {
+    assert.ok(index.includes(`id="${id}"`), `index.html is missing #${id}`);
+  }
+  for (const cls of ['offline-banner', 'offline-badge', 'offline-card', 'offline-status']) {
+    assert.ok(index.includes(cls), `index.html is missing class ${cls}`);
+    assert.ok(fs.readFileSync('css/offline.css', 'utf8').includes(`.${cls}`), `css/offline.css is missing .${cls}`);
+  }
+  const offlineHtml = fs.readFileSync('offline.html', 'utf8');
+  assert.match(offlineHtml, /href="\.\/"/, 'offline.html must link back to the app (recovery)');
+});

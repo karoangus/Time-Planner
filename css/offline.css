@@ -1,7 +1,8 @@
 /* Time Planner — سبک‌های بخش آفلاین و تنظیمات (بدون وابستگی به Tailwind) */
 
 /* بنر آفلاین: فقط در حالت قطع اینترنت نمایش داده می‌شود (navigator.onLine === false) */
-.lp-offline-banner {
+.lp-offline-banner,
+.offline-banner {
   position: sticky;
   top: 0;
   z-index: 60;
@@ -14,10 +15,12 @@
   border-bottom: 2px solid #d97706;
   box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
 }
-.lp-offline-banner[hidden] { display: none; }
+.lp-offline-banner[hidden],
+.offline-banner[hidden] { display: none; }
 
 /* بج کوچک آفلاین در هدر */
-.lp-offline-badge {
+.lp-offline-badge,
+.offline-badge {
   display: inline-block;
   margin-top: 0.5rem;
   padding: 0.15rem 0.9rem;
@@ -28,7 +31,8 @@
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   box-shadow: 0 2px 8px rgba(217, 119, 6, 0.45);
 }
-.lp-offline-badge[hidden] { display: none; }
+.lp-offline-badge[hidden],
+.offline-badge[hidden] { display: none; }
 
 /* باکس صادقانهٔ «آفلاین و اینترنت ملی» */
 .lp-offline-honest {
@@ -130,3 +134,20 @@ html.lp-perf .glass {
 html.lp-perf .course-card { transition: none !important; }
 html.lp-perf .course-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,.08) !important; }
 html.lp-perf * { animation-duration: 0.01ms !important; }
+
+/* نام‌های کلاس بدون پیشوند (سازگاری با پرامپت اصلی) — همان رفتار */
+.offline-card {
+  border: 2px solid #a5b4fc;
+}
+.offline-status {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.9;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
